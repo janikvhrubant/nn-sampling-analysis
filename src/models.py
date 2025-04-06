@@ -1,5 +1,7 @@
 from torch import nn, optim
-from data_classes import NeuralNetworkArchitecture, BaseTrainingConfig, TrainingData, OptimizationMethod
+from data_classes.architecture import NeuralNetworkArchitecture
+from data_classes.training_config import BaseTrainingConfig, OptimizationMethod
+from data_classes.training_data import TrainingData
 import torch
 
 def init_weights(m):
