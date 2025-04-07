@@ -59,6 +59,7 @@ By analyzing training convergence, generalization error, and robustness across t
 ```
 
 ## How to Use
-1. **Sampling**: Generate input data using MC or QMC in `notebooks/sampling.ipynb`.
-2. **Training**: Run experiments and train models via `notebooks/experiment.ipynb`.
-3. **Evaluation**: Analyze model performance and compare results in `notebooks/evaluate.ipynb`.
+1. **Setup**: Run `pip install -r requirements.txt` with Python 3.10 or higher to install required dependencies.
+2. **Sampling**: Generate input data using MC or QMC in `notebooks/sampling.ipynb`.
+3. **Training**: Run experiments and train models via `notebooks/experiment.ipynb`.
+4. **Evaluation**: Analyze model performance and compare results in `notebooks/evaluate.ipynb`.
