@@ -11,7 +11,7 @@ class BaseTrainingConfig:
     NUM_EPOCHS: int
 
 @dataclass
-class TrainingSetup:
+class TrainingSettings:
     nn_architecture: NeuralNetworkArchitecture
     training_config: BaseTrainingConfig
     training_set_size: int
