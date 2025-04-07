@@ -56,6 +56,7 @@ By analyzing training convergence, generalization error, and robustness across t
     │   └── training_results.py
     ├── models.py                 # Model architectures
     └── sampling.py              # Sampling logic for MC and QMC
+```
 
 ## How to Use
 1. **Sampling**: Generate input data using MC or QMC in `notebooks/sampling.ipynb`.
