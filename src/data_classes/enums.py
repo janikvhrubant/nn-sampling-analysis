@@ -7,7 +7,7 @@ class Scenario(Enum):
     AIRFOIL = "airfoil"
 
 class SamplingMethod(Enum):
-    QMC = "qmc"
+    SOBOL = "sobol"
     MC = "mc"
 
 class OptimizationMethod(Enum):
