@@ -65,6 +65,6 @@ By analyzing training convergence, generalization error, and robustness across t
 4. **Evaluation**: Analyze model performance and compare results in `notebooks/evaluate.ipynb`.
 
 ## Future Work
-[] Extend the evaluation to more problem types (e.g., PDEs, physics-based models).
-[] Implement more QMC-strategies such as Lattice-Sequence
-[] Maybe: Introduce adaptive sampling during training
+- [ ] Extend the evaluation to more problem types (e.g., PDEs, physics-based models).
+- [ ] Implement more QMC-strategies such as Lattice-Sequence
+- [ ] Maybe: Introduce adaptive sampling during training
