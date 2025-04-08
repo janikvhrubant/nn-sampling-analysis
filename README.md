@@ -45,7 +45,7 @@ By analyzing training convergence, generalization error, and robustness across t
 │   ├── experiment.ipynb
 │   └── sampling.ipynb
 └── src/                           # Source code
-    ├── data_classes/             # Custom data classes and config definitions
+    ├── data_classes/              # Custom data classes and config definitions
     │   ├── __init__.py
     │   ├── architecture.py
     │   ├── enums.py
@@ -54,8 +54,8 @@ By analyzing training convergence, generalization error, and robustness across t
     │   ├── training_config.py
     │   ├── training_data.py
     │   └── training_results.py
-    ├── models.py                 # Model architectures
-    └── sampling.py              # Sampling logic for MC and Sobol sequences
+    ├── models.py                  # Model architectures
+    └── sampling.py                # Sampling logic for MC and Sobol sequences
 ```
 
 ## How to Use
