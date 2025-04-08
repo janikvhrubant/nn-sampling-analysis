@@ -27,7 +27,7 @@ By analyzing training convergence, generalization error, and robustness across t
 
 ```text
 .
-├── README.md                       # Project documentation
+├── README.md                      # Project documentation
 ├── data/
 │   └── sum_sines/
 │       ├── input/                 # Input samples (MC & SOBOL)
