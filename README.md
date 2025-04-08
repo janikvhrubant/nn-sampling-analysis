@@ -28,6 +28,7 @@ By analyzing training convergence, generalization error, and robustness across t
 ```text
 .
 ├── README.md                      # Project documentation
+├── requirements.txt               # Contains all required Python packages
 ├── data/
 │   └── sum_sines/
 │       ├── input/                 # Input samples (MC & SOBOL)
