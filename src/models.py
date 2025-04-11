@@ -14,6 +14,8 @@ def init_weights(m):
 class SequentialNeuralNetwork:
     def __init__(self, net_arch: NeuralNetworkArchitecture):
         self.net_arch = net_arch
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         if net_arch.BATCH_NORMALIZATION:
             model = nn.Sequential(
                 nn.Linear(net_arch.INPUT_DIM, net_arch.DEPTH),
@@ -32,15 +34,13 @@ class SequentialNeuralNetwork:
                 model = nn.Sequential(
                     model, nn.Linear(net_arch.DEPTH, net_arch.DEPTH),
                     net_arch.ACTIVATION_FUNCTION())
+
         self.model = nn.Sequential(
             model, nn.Linear(net_arch.DEPTH, net_arch.OUTPUT_DIM))
-        
-        self.model.apply(init_weights)
-        
-        # if net_arch.Xavier_init:
-        #     model.apply(init_weights)
 
-    
+        self.model.apply(init_weights)
+        self.model = self.model.to(self.device)
+
     def create_optimizer(self, config: BaseTrainingConfig):
         match config.OPTIMIZER:
             case OptimizationMethod.SGD:
@@ -72,30 +72,35 @@ class SequentialNeuralNetwork:
             case _:
                 raise NotImplementedError(f"Optimizer for {config.OPTIMIZER} is not implemented")
 
-
     def evaluate(self, data: TrainingData):
         test_objective = nn.L1Loss()
-        output_train = self.model(data.train_x.float())
-        train_error = test_objective(output_train, data.train_y.float()).item()
 
-        output_test = self.model(data.test_x.float())
-        generalization_error = test_objective(output_test, data.test_y.float()).item()
+        train_x = data.train_x.to(self.device).float()
+        train_y = data.train_y.to(self.device).float()
+        test_x = data.test_x.to(self.device).float()
+        test_y = data.test_y.to(self.device).float()
+
+        output_train = self.model(train_x)
+        train_error = test_objective(output_train, train_y).item()
+
+        output_test = self.model(test_x)
+        generalization_error = test_objective(output_test, test_y).item()
 
         self.train_error = train_error
         self.generalization_error = generalization_error
 
-
     def train(self, settings: BaseTrainingConfig, data: TrainingData):
         optimizer = self.create_optimizer(settings)
-        train_x = data.train_x
-        train_y = data.train_y
+
+        train_x = data.train_x.to(self.device).float()
+        train_y = data.train_y.to(self.device).float()
 
         train_objective = nn.MSELoss()
 
         for e in range(settings.NUM_EPOCHS):
             optimizer.zero_grad()
-            output = self.model(train_x.float())
-            loss = train_objective(output, train_y.float())
+            output = self.model(train_x)
+            loss = train_objective(output, train_y)
             loss.backward()
             optimizer.step()
 
