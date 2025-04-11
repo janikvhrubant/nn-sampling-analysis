@@ -1,0 +1,2 @@
+learning_rate,reg_param,batch_norm,depth,num_hidden_layers,activation,train_error,test_error,train_size
+0.001,1e-07,True,16,24,Sigmoid,0.017476022243499756,1.5781763792037964,128
