@@ -3,6 +3,7 @@ from data_classes.architecture import NeuralNetworkArchitecture
 from data_classes.training_config import BaseTrainingConfig, OptimizationMethod
 from data_classes.training_data import TrainingData
 import torch
+from datetime import datetime
 
 def init_weights(m):
     if isinstance(m, nn.Linear):
@@ -97,13 +98,14 @@ class SequentialNeuralNetwork:
 
         train_objective = nn.MSELoss()
 
+        t = datetime.now()
         for e in range(settings.NUM_EPOCHS):
             optimizer.zero_grad()
             output = self.model(train_x)
             loss = train_objective(output, train_y)
             loss.backward()
             optimizer.step()
-
+        optim_time = datetime.now() - t
         self.evaluate(data)
 
         self.training_results = {
@@ -116,4 +118,5 @@ class SequentialNeuralNetwork:
             "train_error": self.train_error,
             "test_error": self.generalization_error,
             "train_size": len(data.train_x),
+            "optim_time": optim_time.seconds
         }
