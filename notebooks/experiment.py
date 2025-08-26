@@ -110,7 +110,9 @@ else:
 
 counter = 0
 
-for ts in tqdm.tqdm(all_training_settings, desc="Training Progress"):
+import concurrent.futures
+
+def run_training(ts):
     nn = SequentialNeuralNetwork(
         net_arch=ts.nn_architecture
     )
@@ -121,9 +123,13 @@ for ts in tqdm.tqdm(all_training_settings, desc="Training Progress"):
     nn.train(settings=ts.training_config, data=training_data)
     nn.training_results['version'] = version
     nn.training_results['scenario'] = experiment.SCENARIO.value
-    results_list.append(nn.training_results)
-    df_results = pd.DataFrame(results_list)
+    return nn.training_results
 
-    df_results.sort_values('test_error', inplace=True)
-    df_results.reset_index(drop=True, inplace=True)
-    df_results.to_csv(csv_path, index=False)
+with concurrent.futures.ProcessPoolExecutor() as executor:
+    results = list(tqdm.tqdm(executor.map(run_training, all_training_settings), total=len(all_training_settings), desc="Training Progress"))
+
+results_list.extend(results)
+df_results = pd.DataFrame(results_list)
+df_results.sort_values('test_error', inplace=True)
+df_results.reset_index(drop=True, inplace=True)
+df_results.to_csv(csv_path, index=False)
