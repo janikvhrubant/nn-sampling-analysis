@@ -26,7 +26,7 @@ scenario_settings.DATA_PATH = 'data/sum_sines_6d'
 input_data = InputData(scenario_settings.DATA_PATH)
 
 # NN Architectures
-widths = [2,8,16,64]
+widths = [4,6,8]
 depths = [2,4,8]
 activation_functions = [torch.nn.Sigmoid, torch.nn.Tanh]
 
@@ -44,9 +44,9 @@ lion_lr_wd_combos = [(3e-3,0),(3e-3, 1e-6),(1e-3,0),(1e-3,1e-6),(3e-3,1e-5),(1e-
 
 
 # Learing settings:
-training_set_sizes = [128,512,2048,8192]
-batch_sizes = [64,256,512,1024,2048]
-epochs = [50,100,250,500,750,1000,1250,1500]
+training_set_sizes = [128,512,1024,2048,4096,8192]
+batch_sizes = [64,256,1024]
+epochs = [500,1000,1500]
 
 all_training_settings = []
 for width, depth, activation_func, train_set_size, batch_size, epoch in product(widths, depths, activation_functions, training_set_sizes, batch_sizes, epochs):
