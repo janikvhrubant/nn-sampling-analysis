@@ -1,10 +1,15 @@
 import numpy as np
-import sobol_seq
+from scipy.stats import qmc
 
 def generate_random_sequence(num_samples: int, dim: int):
     return np.random.rand(num_samples, dim)
 
 def generate_sobol_sequence(num_samples: int, dim: int):
-    return sobol_seq.i4_sobol_generate(dim, num_samples)
+    sampler = qmc.Sobol(d=dim, scramble=False)
+    num_samples_opt = 2**int(np.ceil(np.log2(num_samples)))
+    samples = sampler.random(n=num_samples_opt)
+    return samples[:num_samples, :]
 
-# def generate_
+def generate_halton_sequence(num_samples: int, dim: int):
+    sampler = qmc.Halton(d=dim, scramble=False)
+    return sampler.random(n=num_samples)

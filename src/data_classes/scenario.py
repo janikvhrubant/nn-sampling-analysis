@@ -20,20 +20,30 @@ class ScenarioSettings:
             case Scenario.BSPDE:
                 self.INPUT_DIM = 5
                 self.OUTPUT_DIM = 1
-                self.TRAINING_SET_SIZES = (np.logspace(5, 11, 7, base=2).astype(int)).tolist()
-            case Scenario.SUM_SINES:
+                # self.TRAINING_SET_SIZES = (np.logspace(5, 11, 7, base=2).astype(int)).tolist()
+            case Scenario.SUM_SINES_6D:
                 self.INPUT_DIM = 6
                 self.OUTPUT_DIM = 1
-                self.TRAINING_SET_SIZES = (np.logspace(7, 13, 7, base=2).astype(int)).tolist()
                 self.COL_NAMES = ['dim_1', 'dim_2', 'dim_3', 'dim_4', 'dim_5', 'dim_6', 'sum_sines']
+                # self.TRAINING_SET_SIZES = (np.logspace(7, 13, 7, base=2).astype(int)).tolist()
+            case Scenario.SUM_SINES_8D:
+                self.INPUT_DIM = 8
+                self.OUTPUT_DIM = 1
+                self.COL_NAMES = ['dim_1', 'dim_2', 'dim_3', 'dim_4', 'dim_5', 'dim_6', 'dim_7', 'dim_8', 'sum_sines']
+                # self.TRAINING_SET_SIZES = (np.logspace(7, 13, 7, base=2).astype(int)).tolist()
+            case Scenario.SUM_SINES_10D:
+                self.INPUT_DIM = 10
+                self.OUTPUT_DIM = 1
+                self.COL_NAMES = ['dim_1', 'dim_2', 'dim_3', 'dim_4', 'dim_5', 'dim_6', 'dim_7', 'dim_8', 'dim_9', 'dim_10', 'sum_sines']
+                # self.TRAINING_SET_SIZES = (np.logspace(7, 13, 7, base=2).astype(int)).tolist()
             case Scenario.PROJECTILE:
                 self.INPUT_DIM = 7
                 self.OUTPUT_DIM = 1
-                self.TRAINING_SET_SIZES = (np.logspace(4, 10, 7, base=2).astype(int)).tolist()
+                # self.TRAINING_SET_SIZES = (np.logspace(4, 10, 7, base=2).astype(int)).tolist()
                 self.COL_NAMES = ['density', 'radius', 'drag_coeff', 'mass', 'height', 'alpha', 'velocity', 'distance']
             case Scenario.AIRFOIL:
                 self.INPUT_DIM = 4
                 self.OUTPUT_DIM = 1
-                self.TRAINING_SET_SIZES = (np.logspace(2, 8, 7, base=2).astype(int)).tolist()
+                # self.TRAINING_SET_SIZES = (np.logspace(2, 8, 7, base=2).astype(int)).tolist()
             case _:
                 raise ValueError(f"Unknown scenario: {scenario}")

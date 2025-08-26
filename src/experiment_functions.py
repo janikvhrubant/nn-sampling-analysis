@@ -87,7 +87,11 @@ def sum_sines_fun(x: np.ndarray):
 
 def get_experiment_function(scenario: Scenario):
     match scenario:
-        case Scenario.SUM_SINES:
+        case Scenario.SUM_SINES_6D:
+            return sum_sines_fun
+        case Scenario.SUM_SINES_8D:
+            return sum_sines_fun
+        case Scenario.SUM_SINES_10D:
             return sum_sines_fun
         case Scenario.PROJECTILE:
             return projectile_motion_fun
