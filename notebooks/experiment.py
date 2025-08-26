@@ -2,11 +2,11 @@ import os
 import sys
 import pandas as pd
 import torch
-from datetime import datetime
-import tqdm
+from tqdm import tqdm
 from itertools import product
+from concurrent.futures import ProcessPoolExecutor
 
-sys.path.append(os.path.abspath(os.path.join('..', 'src')))
+sys.path.append(os.path.abspath(os.path.join('src')))
 from data_classes.architecture import NeuralNetworkArchitecture
 from data_classes.enums import OptimizationMethod
 from data_classes.experiment import Experiment, SamplingMethod
@@ -21,6 +21,7 @@ experiment = Experiment(
 )
 
 scenario_settings = ScenarioSettings(experiment.SCENARIO)
+scenario_settings.DATA_PATH = 'data/sum_sines_6d'
 
 input_data = InputData(scenario_settings.DATA_PATH)
 
@@ -94,28 +95,16 @@ for width, depth, activation_func, train_set_size, batch_size, epoch in product(
             training_set_size=train_set_size
         ))
 
-output_dir = os.path.abspath(os.path.join('..', 'data', experiment.SCENARIO.value, 'output'))
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir, exist_ok=True)
-csv_path = os.path.join(output_dir, 'results.csv')
 
-if os.path.exists(csv_path):
-    df = pd.read_csv(csv_path)
-    version = df['version'].max() + 1
-    results_list = df.to_dict(orient='records')
-else:
-    df = pd.DataFrame(columns=['version','optimizer', 'learning_rate', 'weight_decay', 'beta_1', 'beta_2', 'eps', 'num_epochs', 'batch_size', 'training_set_size', 'train_error', 'test_error', 'train_time', 'n_layers', 'layer_depth', 'activation_function', 'sampling_method', 'scenario'])
-    version = 1
-    results_list = []
+from concurrent.futures import ProcessPoolExecutor
+from tqdm import tqdm
+from functools import partial
 
-counter = 0
+from models import SequentialNeuralNetwork
 
-import concurrent.futures
-
-def run_training(ts):
-    nn = SequentialNeuralNetwork(
-        net_arch=ts.nn_architecture
-    )
+def train_single(ts, input_data, experiment, version):
+    """Train a single NN configuration and return the results dict."""
+    nn = SequentialNeuralNetwork(net_arch=ts.nn_architecture)
     training_data = input_data.get_training_and_test_data(
         sampling_method=experiment.SAMPLING_METHOD,
         training_set_size=ts.training_set_size
@@ -125,11 +114,37 @@ def run_training(ts):
     nn.training_results['scenario'] = experiment.SCENARIO.value
     return nn.training_results
 
-with concurrent.futures.ProcessPoolExecutor() as executor:
-    results = list(tqdm.tqdm(executor.map(run_training, all_training_settings), total=len(all_training_settings), desc="Training Progress"))
 
-results_list.extend(results)
-df_results = pd.DataFrame(results_list)
-df_results.sort_values('test_error', inplace=True)
-df_results.reset_index(drop=True, inplace=True)
-df_results.to_csv(csv_path, index=False)
+if __name__ == "__main__":
+    # Output directory setup
+    output_dir = os.path.abspath(os.path.join('data', experiment.SCENARIO.value, 'output'))
+    os.makedirs(output_dir, exist_ok=True)
+    csv_path = os.path.join(output_dir, 'results.csv')
+
+    if os.path.exists(csv_path):
+        df = pd.read_csv(csv_path)
+        version = df['version'].max() + 1
+        results_list = df.to_dict(orient='records')
+    else:
+        df = pd.DataFrame(columns=[
+            'version','optimizer', 'learning_rate', 'weight_decay', 'beta_1', 'beta_2', 'eps',
+            'num_epochs', 'batch_size', 'training_set_size', 'train_error', 'test_error', 'train_time',
+            'n_layers', 'layer_depth', 'activation_function', 'sampling_method', 'scenario'
+        ])
+        version = 1
+        results_list = []
+
+    # Use ProcessPoolExecutor to parallelize
+    results = []
+    with ProcessPoolExecutor() as executor:
+        # functools.partial binds input_data, experiment, version
+        func = partial(train_single, input_data=input_data, experiment=experiment, version=version)
+        for result in tqdm(executor.map(func, all_training_settings), total=len(all_training_settings), desc="Training Progress"):
+            results.append(result)
+
+    # Combine old results with new results
+    results_list.extend(results)
+    df_results = pd.DataFrame(results_list)
+    df_results.sort_values('test_error', inplace=True)
+    df_results.reset_index(drop=True, inplace=True)
+    df_results.to_csv(csv_path, index=False)
