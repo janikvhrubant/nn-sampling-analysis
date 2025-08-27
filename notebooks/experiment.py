@@ -16,7 +16,7 @@ from data_classes.training_config import AdamTrainingConfig, TrainingSettings, L
 from models import SequentialNeuralNetwork
 
 experiment = Experiment(
-    SAMPLING_METHOD=SamplingMethod.SOBOL,
+    SAMPLING_METHOD=SamplingMethod.HALTON,
     SCENARIO=Scenario.SUM_SINES_6D
 )
 

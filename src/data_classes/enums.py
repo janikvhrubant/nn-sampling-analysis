@@ -9,6 +9,7 @@ class Scenario(Enum):
     AIRFOIL = "airfoil"
 
 class SamplingMethod(Enum):
+    HALTON = "halton"
     SOBOL = "sobol"
     MC = "mc"
 
