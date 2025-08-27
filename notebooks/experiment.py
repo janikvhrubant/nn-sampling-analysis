@@ -15,6 +15,10 @@ from data_classes.training_data import InputData
 from data_classes.training_config import AdamTrainingConfig, TrainingSettings, LionTrainingConfig
 from models import SequentialNeuralNetwork
 
+
+#device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+
+
 experiment = Experiment(
     SAMPLING_METHOD=SamplingMethod.HALTON,
     SCENARIO=Scenario.SUM_SINES_6D

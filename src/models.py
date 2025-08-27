@@ -17,7 +17,14 @@ def init_weights(m):
 class SequentialNeuralNetwork:
     def __init__(self, net_arch: NeuralNetworkArchitecture):
         self.net_arch = net_arch
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("mps" if torch.mps.is_available() else "cpu")
+
+        if torch.backends.mps.is_available():
+            self.device = torch.device("mps")
+        elif torch.cuda.is_available():
+            self.device = torch.device("cuda")
+        else:
+            self.device = torch.device("cpu")
 
         if net_arch.BATCH_NORMALIZATION:
             model = nn.Sequential(
