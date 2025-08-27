@@ -139,6 +139,7 @@ if __name__ == "__main__":
     with ProcessPoolExecutor() as executor:
         # functools.partial binds input_data, experiment, version
         func = partial(train_single, input_data=input_data, experiment=experiment, version=version)
+        train_single(all_training_settings[0], input_data, experiment, version)  # Warm-up run to avoid overhead in tqdm
         for result in tqdm(executor.map(func, all_training_settings), total=len(all_training_settings), desc="Training Progress"):
             results.append(result)
 
