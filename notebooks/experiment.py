@@ -20,8 +20,8 @@ from models import SequentialNeuralNetwork
 
 
 experiment = Experiment(
-    SAMPLING_METHOD=SamplingMethod.HALTON,
-    SCENARIO=Scenario.SUM_SINES_6D
+    SAMPLING_METHOD=SamplingMethod.SOBOL,
+    SCENARIO=Scenario.PROJECTILE
 )
 
 scenario_settings = ScenarioSettings(experiment.SCENARIO)
