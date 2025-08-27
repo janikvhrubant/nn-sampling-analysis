@@ -1,3 +1,4 @@
+# src/models.py
 from torch import nn, optim, utils
 from data_classes.architecture import NeuralNetworkArchitecture
 from data_classes.training_config import BaseTrainingConfig, OptimizationMethod
@@ -17,12 +18,12 @@ def init_weights(m):
 class SequentialNeuralNetwork:
     def __init__(self, net_arch: NeuralNetworkArchitecture):
         self.net_arch = net_arch
-        self.device = torch.device("mps" if torch.mps.is_available() else "cpu")
 
-        if torch.backends.mps.is_available():
-            self.device = torch.device("mps")
-        elif torch.cuda.is_available():
+        # Prefer CUDA, then MPS, else CPU
+        if torch.cuda.is_available():
             self.device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            self.device = torch.device("mps")
         else:
             self.device = torch.device("cpu")
 
@@ -114,8 +115,9 @@ class SequentialNeuralNetwork:
         num_epochs = getattr(settings, "NUM_EPOCHS", getattr(settings, "num_epochs", 1))
         batch_size = getattr(settings, "BATCH_SIZE", getattr(settings, "batch_size", None))
 
-        train_x_cpu = data.train_x.to(self.device).float()
-        train_y_cpu = data.train_y.to(self.device).float()
+        # Keep on CPU; only move inside the loop
+        train_x_cpu = data.train_x.float()
+        train_y_cpu = data.train_y.float()
 
         use_full_batch = (batch_size is None) or (batch_size >= len(train_x_cpu))
 
@@ -123,36 +125,38 @@ class SequentialNeuralNetwork:
         t = datetime.now()
 
         if use_full_batch:
-            tx = train_x_cpu.to(self.device)
-            ty = train_y_cpu.to(self.device)
+            tx = train_x_cpu.to(self.device, non_blocking=(self.device.type == "cuda"))
+            ty = train_y_cpu.to(self.device, non_blocking=(self.device.type == "cuda"))
             for _ in range(num_epochs):
                 optimizer.zero_grad(set_to_none=True)
                 output = self.model(tx)
                 loss = criterion(output, ty)
                 loss.backward()
                 optimizer.step()
-            effective_batch_size = len(train_x_cpu)
+            effective_bs = None
         else:
             dataset = TensorDataset(train_x_cpu, train_y_cpu)
             loader = DataLoader(
-                dataset, 
-                batch_size=batch_size, 
-                shuffle=True, 
-                drop_last=False, 
-                pin_memory=torch.cuda.is_available()
+                dataset,
+                batch_size=batch_size,
+                shuffle=True,
+                drop_last=False,
+                num_workers=0,  # avoid nested multiprocessing on Windows
+                pin_memory=(self.device.type == "cuda"),
+                # pin_memory_device="cuda",  # optional for PyTorch >= 2.0
             )
 
             for _ in range(num_epochs):
                 for bx_cpu, by_cpu in loader:
-                    bx = bx_cpu.to(self.device, non_blocking=True).float()
-                    by = by_cpu.to(self.device, non_blocking=True).float()
+                    bx = bx_cpu.to(self.device, non_blocking=(self.device.type == "cuda")).float()
+                    by = by_cpu.to(self.device, non_blocking=(self.device.type == "cuda")).float()
                     optimizer.zero_grad(set_to_none=True)
                     output = self.model(bx)
                     loss = criterion(output, by)
                     loss.backward()
                     optimizer.step()
             effective_bs = batch_size
-        
+
         optim_time = datetime.now() - t
 
         self.evaluate(data)
@@ -165,13 +169,12 @@ class SequentialNeuralNetwork:
             "beta_2": getattr(settings, "BETAS", (None, None))[1],
             "eps": getattr(settings, "EPS", None),
             "num_epochs": num_epochs,
-            "batch_size": effective_bs if not use_full_batch else None,
-            # "batch_norm": self.net_arch.BATCH_NORMALIZATION,
+            "batch_size": effective_bs,
             "layer_depth": self.net_arch.DEPTH,
             "n_layers": self.net_arch.NUM_HIDDEN_LAYERS,
             "activation_function": self.net_arch.ACTIVATION_FUNCTION.__name__,
             "train_error": self.train_error,
             "test_error": self.generalization_error,
             "training_set_size": len(data.train_x),
-            "train_time": optim_time.seconds
+            "train_time": optim_time.total_seconds()
         }
