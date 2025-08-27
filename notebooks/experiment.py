@@ -25,7 +25,7 @@ experiment = Experiment(
 )
 
 scenario_settings = ScenarioSettings(experiment.SCENARIO)
-scenario_settings.DATA_PATH = 'data/sum_sines_6d'
+scenario_settings.DATA_PATH = f'data/{experiment.SCENARIO.value}'
 
 input_data = InputData(scenario_settings.DATA_PATH)
 
