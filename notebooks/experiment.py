@@ -5,6 +5,7 @@ import torch
 from tqdm import tqdm
 from itertools import product
 from concurrent.futures import ProcessPoolExecutor
+from functools import partial
 
 sys.path.append(os.path.abspath(os.path.join('src')))
 from data_classes.architecture import NeuralNetworkArchitecture
@@ -14,10 +15,6 @@ from data_classes.scenario import Scenario, ScenarioSettings
 from data_classes.training_data import InputData
 from data_classes.training_config import AdamTrainingConfig, TrainingSettings, LionTrainingConfig
 from models import SequentialNeuralNetwork
-
-
-#device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-
 
 experiment = Experiment(
     SAMPLING_METHOD=SamplingMethod.SOBOL,
@@ -46,8 +43,7 @@ lion_beta1s = [0.9]
 lion_beta2s = [0.99]
 lion_lr_wd_combos = [(3e-3,0),(3e-3, 1e-6),(1e-3,0),(1e-3,1e-6),(3e-3,1e-5),(1e-3,1e-5)]
 
-
-# Learing settings:
+# Learning settings:
 training_set_sizes = [128,512,1024,2048,4096,8192]
 batch_sizes = [64,256,1024]
 epochs = [800,1200]
@@ -63,6 +59,7 @@ for width, depth, activation_func, train_set_size, batch_size, epoch in product(
         ACTIVATION_FUNCTION=activation_func
     )
 
+    # Adam configs
     for beta1, beta2, lr_wd, epsilon in product(adam_beta1s, adam_beta2s, adam_lr_wd_combos, adam_epsilons):
         learning_rate, weight_decay = lr_wd
         
@@ -82,7 +79,9 @@ for width, depth, activation_func, train_set_size, batch_size, epoch in product(
             training_set_size=train_set_size
         ))
     
+    # Lion configs (BUGFIX: lr/wd entpacken)
     for beta1, beta2, lr_wd in product(lion_beta1s, lion_beta2s, lion_lr_wd_combos):
+        learning_rate, weight_decay = lr_wd
 
         training_config = LionTrainingConfig(
             OPTIMIZER=OptimizationMethod.LION,
@@ -99,13 +98,6 @@ for width, depth, activation_func, train_set_size, batch_size, epoch in product(
             training_set_size=train_set_size
         ))
 
-
-from concurrent.futures import ProcessPoolExecutor
-from tqdm import tqdm
-from functools import partial
-
-from models import SequentialNeuralNetwork
-
 def train_single(ts, input_data, experiment, version):
     """Train a single NN configuration and return the results dict."""
     nn = SequentialNeuralNetwork(net_arch=ts.nn_architecture)
@@ -116,6 +108,7 @@ def train_single(ts, input_data, experiment, version):
     nn.train(settings=ts.training_config, data=training_data)
     nn.training_results['version'] = version
     nn.training_results['scenario'] = experiment.SCENARIO.value
+    nn.training_results['sampling_method'] = experiment.SAMPLING_METHOD.value
     return nn.training_results
 
 
@@ -127,7 +120,7 @@ if __name__ == "__main__":
 
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path)
-        version = df['version'].max() + 1
+        version = (df['version'].max() + 1) if not df.empty else 1
         results_list = df.to_dict(orient='records')
     else:
         df = pd.DataFrame(columns=[
@@ -138,16 +131,14 @@ if __name__ == "__main__":
         version = 1
         results_list = []
 
-    # Use ProcessPoolExecutor to parallelize
     results = []
     with ProcessPoolExecutor() as executor:
-        # functools.partial binds input_data, experiment, version
         func = partial(train_single, input_data=input_data, experiment=experiment, version=version)
-        train_single(all_training_settings[0], input_data, experiment, version)  # Warm-up run to avoid overhead in tqdm
+        # warm-up
+        train_single(all_training_settings[0], input_data, experiment, version)
         for result in tqdm(executor.map(func, all_training_settings), total=len(all_training_settings), desc="Training Progress"):
             results.append(result)
 
-    # Combine old results with new results
     results_list.extend(results)
     df_results = pd.DataFrame(results_list)
     df_results.sort_values('test_error', inplace=True)
