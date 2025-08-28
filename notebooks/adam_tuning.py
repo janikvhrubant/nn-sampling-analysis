@@ -47,7 +47,7 @@ else:
 scenario_settings = ScenarioSettings(SCENARIO)
 scenario_settings.DATA_PATH = f"data/{SCENARIO.value}"
 DATA_PATH = scenario_settings.DATA_PATH
-max_epochs = 2000
+max_epochs = 1000
 eps = 1e-8
 training_set_size = 8192
 trials = 100
