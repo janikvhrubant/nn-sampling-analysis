@@ -50,7 +50,7 @@ DATA_PATH = scenario_settings.DATA_PATH
 max_epochs = 2000
 eps = 1e-8
 training_set_size = 8192
-trials = 300
+trials = 100
 
 # ---- Output paths ----
 output_dir = os.path.abspath(os.path.join("data", SCENARIO.value, "output", SAMPLING_METHOD.value, "adam"))
