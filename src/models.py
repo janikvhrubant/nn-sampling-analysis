@@ -6,7 +6,9 @@ from data_classes.training_data import TrainingData
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 from lion_pytorch import Lion
-from datetime import datetime
+import time
+from torch.utils.tensorboard import SummaryWriter
+import optuna
 
 def init_weights(m):
     if isinstance(m, nn.Linear):
@@ -85,8 +87,7 @@ class SequentialNeuralNetwork:
                     params=self.model.parameters(),
                     lr=config.LEARNING_RATE,
                     betas=config.BETAS,
-                    weight_decay=config.REG_PARAM,
-                    # use_triton=True
+                    weight_decay=config.REG_PARAM
                 )
             case _:
                 raise NotImplementedError(f"Optimizer for {config.OPTIMIZER} is not implemented")
@@ -108,57 +109,81 @@ class SequentialNeuralNetwork:
         self.train_error = train_error
         self.generalization_error = generalization_error
 
-    def train(self, settings: BaseTrainingConfig, data: TrainingData):
+    def train(self, settings: BaseTrainingConfig, data: TrainingData, trial=None, report_every: int = 25):
         optimizer = self.create_optimizer(settings)
         criterion = nn.MSELoss()
 
         num_epochs = getattr(settings, "NUM_EPOCHS", getattr(settings, "num_epochs", 1))
         batch_size = getattr(settings, "BATCH_SIZE", getattr(settings, "batch_size", None))
 
-        # Keep on CPU; only move inside the loop
-        train_x_cpu = data.train_x.float()
-        train_y_cpu = data.train_y.float()
+        train_x = data.train_x.float()
+        train_y = data.train_y.float()
+        test_x  = data.test_x.to(self.device).float()
+        test_y  = data.test_y.to(self.device).float()
 
-        use_full_batch = (batch_size is None) or (batch_size >= len(train_x_cpu))
+        batch_size = len(train_x) if batch_size is None or batch_size > len(train_x) else batch_size
 
         self.model.train()
-        t = datetime.now()
+        start_time = time.time()
 
-        if use_full_batch:
-            tx = train_x_cpu.to(self.device, non_blocking=(self.device.type == "cuda"))
-            ty = train_y_cpu.to(self.device, non_blocking=(self.device.type == "cuda"))
-            for _ in range(num_epochs):
+        dataset = TensorDataset(train_x, train_y)
+        loader = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            drop_last=False,
+            pin_memory=(self.device.type == "cuda")
+        )
+
+        log_dir = f"data/{settings.OPTIMIZER.value}_logs_{time.strftime('%Y%m%d-%H%M%S')}"
+        writer = SummaryWriter(log_dir=log_dir)
+
+        for epoch in range(num_epochs):
+            epoch_start = time.time()
+            running_loss = 0.0
+            n_samples = 0
+
+            for bx, by in loader:
+                bx = bx.to(self.device, non_blocking=(self.device.type == "cuda")).float()
+                by = by.to(self.device, non_blocking=(self.device.type == "cuda")).float()
+
                 optimizer.zero_grad(set_to_none=True)
-                output = self.model(tx)
-                loss = criterion(output, ty)
+                output = self.model(bx)
+                loss = criterion(output, by)
                 loss.backward()
                 optimizer.step()
-            effective_bs = None
-        else:
-            dataset = TensorDataset(train_x_cpu, train_y_cpu)
-            loader = DataLoader(
-                dataset,
-                batch_size=batch_size,
-                shuffle=True,
-                drop_last=False,
-                num_workers=0,  # avoid nested multiprocessing on Windows
-                pin_memory=(self.device.type == "cuda"),
-                # pin_memory_device="cuda",  # optional for PyTorch >= 2.0
-            )
 
-            for _ in range(num_epochs):
-                for bx_cpu, by_cpu in loader:
-                    bx = bx_cpu.to(self.device, non_blocking=(self.device.type == "cuda")).float()
-                    by = by_cpu.to(self.device, non_blocking=(self.device.type == "cuda")).float()
-                    optimizer.zero_grad(set_to_none=True)
-                    output = self.model(bx)
-                    loss = criterion(output, by)
-                    loss.backward()
-                    optimizer.step()
-            effective_bs = batch_size
+                running_loss += loss.item() * bx.size(0)
+                n_samples += bx.size(0)
 
-        optim_time = datetime.now() - t
+            train_loss = running_loss / max(1, n_samples)
 
+            self.model.eval()
+            with torch.no_grad():
+                test_output = self.model(test_x)
+                test_loss = criterion(test_output, test_y).item()
+            self.model.train()
+
+            epoch_time = time.time() - epoch_start
+            cumulative_time = time.time() - start_time
+
+            writer.add_scalar("Loss/train", train_loss, epoch)
+            writer.add_scalar("Loss/test", test_loss, epoch)
+            writer.add_scalar("Time/epoch", epoch_time, epoch)
+            writer.add_scalar("Time/cumulative", cumulative_time, epoch)
+
+            if trial is not None and ((epoch + 1) % report_every == 0 or epoch == num_epochs - 1):
+                trial.report(test_loss, step=epoch)
+                try:
+                    if trial.should_prune():
+                        writer.close()
+                        raise optuna.TrialPruned()
+                except ModuleNotFoundError:
+                    pass
+
+        optim_time = time.time() - start_time
+
+        writer.close()
         self.evaluate(data)
 
         self.training_results = {
@@ -169,7 +194,7 @@ class SequentialNeuralNetwork:
             "beta_2": getattr(settings, "BETAS", (None, None))[1],
             "eps": getattr(settings, "EPS", None),
             "num_epochs": num_epochs,
-            "batch_size": effective_bs,
+            "batch_size": batch_size,
             "layer_depth": self.net_arch.DEPTH,
             "n_layers": self.net_arch.NUM_HIDDEN_LAYERS,
             "activation_function": self.net_arch.ACTIVATION_FUNCTION.__name__,
