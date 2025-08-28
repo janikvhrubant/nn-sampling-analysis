@@ -10,6 +10,12 @@ import time
 from torch.utils.tensorboard import SummaryWriter
 import optuna
 
+
+activation_function_map = {
+    "Sigmoid": nn.Sigmoid,
+    "Tanh": nn.Tanh,
+}
+
 def init_weights(m):
     if isinstance(m, nn.Linear):
         nn.init.xavier_normal_(m.weight)
@@ -33,20 +39,20 @@ class SequentialNeuralNetwork:
             model = nn.Sequential(
                 nn.Linear(net_arch.INPUT_DIM, net_arch.DEPTH),
                 nn.BatchNorm1d(num_features=net_arch.DEPTH),
-                net_arch.ACTIVATION_FUNCTION())
+                activation_function_map[net_arch.ACTIVATION_FUNCTION]())
             for i in range(1, net_arch.NUM_HIDDEN_LAYERS):
                 model = nn.Sequential(
                     model, nn.Linear(net_arch.DEPTH, net_arch.DEPTH),
                     nn.BatchNorm1d(num_features=net_arch.DEPTH),
-                    net_arch.ACTIVATION_FUNCTION())
+                    activation_function_map[net_arch.ACTIVATION_FUNCTION]())
         else:
             model = nn.Sequential(
                 nn.Linear(net_arch.INPUT_DIM, net_arch.DEPTH),
-                net_arch.ACTIVATION_FUNCTION())
+                activation_function_map[net_arch.ACTIVATION_FUNCTION]())
             for i in range(1, net_arch.NUM_HIDDEN_LAYERS):
                 model = nn.Sequential(
                     model, nn.Linear(net_arch.DEPTH, net_arch.DEPTH),
-                    net_arch.ACTIVATION_FUNCTION())
+                    activation_function_map[net_arch.ACTIVATION_FUNCTION]())
 
         self.model = nn.Sequential(
             model, nn.Linear(net_arch.DEPTH, net_arch.OUTPUT_DIM))
@@ -109,7 +115,7 @@ class SequentialNeuralNetwork:
         self.train_error = train_error
         self.generalization_error = generalization_error
 
-    def train(self, settings: BaseTrainingConfig, data: TrainingData, trial=None, report_every: int = 25):
+    def train(self, settings: BaseTrainingConfig, data: TrainingData, trial=None, report_every: int = 25, log_dir: str = None):
         optimizer = self.create_optimizer(settings)
         criterion = nn.MSELoss()
 
@@ -135,7 +141,8 @@ class SequentialNeuralNetwork:
             pin_memory=(self.device.type == "cuda")
         )
 
-        log_dir = f"data/{settings.OPTIMIZER.value}_logs_{time.strftime('%Y%m%d-%H%M%S')}"
+        if log_dir is None:
+            log_dir = f"data/{settings.OPTIMIZER.value}_logs_{time.strftime('%Y%m%d-%H%M%S')}"
         writer = SummaryWriter(log_dir=log_dir)
 
         for epoch in range(num_epochs):
@@ -167,10 +174,10 @@ class SequentialNeuralNetwork:
             epoch_time = time.time() - epoch_start
             cumulative_time = time.time() - start_time
 
-            writer.add_scalar("Loss/train", train_loss, epoch)
-            writer.add_scalar("Loss/test", test_loss, epoch)
-            writer.add_scalar("Time/epoch", epoch_time, epoch)
-            writer.add_scalar("Time/cumulative", cumulative_time, epoch)
+            writer.add_scalar("Training-Loss", train_loss, epoch)
+            writer.add_scalar("Test-Data-Loss", test_loss, epoch)
+            writer.add_scalar("Time per Epoch", epoch_time, epoch)
+            writer.add_scalar("Total Time", cumulative_time, epoch)
 
             if trial is not None and ((epoch + 1) % report_every == 0 or epoch == num_epochs - 1):
                 trial.report(test_loss, step=epoch)
@@ -197,9 +204,9 @@ class SequentialNeuralNetwork:
             "batch_size": batch_size,
             "layer_depth": self.net_arch.DEPTH,
             "n_layers": self.net_arch.NUM_HIDDEN_LAYERS,
-            "activation_function": self.net_arch.ACTIVATION_FUNCTION.__name__,
+            "activation_function": self.net_arch.ACTIVATION_FUNCTION,
             "train_error": self.train_error,
             "test_error": self.generalization_error,
             "training_set_size": len(data.train_x),
-            "train_time": optim_time.total_seconds()
+            "train_time": optim_time
         }

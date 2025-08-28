@@ -7,6 +7,8 @@ import torch
 import optuna
 from optuna.samplers import TPESampler
 from optuna.pruners import MedianPruner
+import argparse
+import json
 
 sys.path.append(os.path.abspath("src"))
 from data_classes.architecture import NeuralNetworkArchitecture
@@ -17,20 +19,47 @@ from data_classes.training_data import InputData
 from data_classes.training_config import TrainingSettings, LionTrainingConfig
 from models import SequentialNeuralNetwork
 
-# ---- Static experiment config ----
-SCENARIO = Scenario.PROJECTILE
-SAMPLING_METHOD = SamplingMethod.SOBOL
+scenario_map = {
+    "projectile": Scenario.PROJECTILE,
+    "sin6d": Scenario.SUM_SINES_6D,
+    "sind8d": Scenario.SUM_SINES_8D,
+    "sin10d": Scenario.SUM_SINES_10D}
+
+sampling_method_map = {
+    "halton": SamplingMethod.HALTON,
+    "sobol": SamplingMethod.SOBOL,
+    "mc": SamplingMethod.MC}
+
+parser = argparse.ArgumentParser(description="Lion tuning experiment")
+parser.add_argument("--scenario", type=str, choices=scenario_map.keys(), default="PROJECTILE", help="Scenario to run")
+parser.add_argument("--sampling", type=str, choices=sampling_method_map.keys(), default="SOBOL", help="Sampling method")
+args, unknown = parser.parse_known_args()
+
+
+# ---- Experiment context ----
+if len(sys.argv) > 1:
+    SCENARIO = scenario_map[args.scenario]
+    SAMPLING_METHOD = sampling_method_map[args.sampling]
+else:
+    SCENARIO = Scenario.PROJECTILE
+    SAMPLING_METHOD = SamplingMethod.SOBOL
 
 scenario_settings = ScenarioSettings(SCENARIO)
 scenario_settings.DATA_PATH = f"data/{SCENARIO.value}"
 DATA_PATH = scenario_settings.DATA_PATH
+max_epochs = 2000
+training_set_size = 8192
+trials = 300
 
 # ---- Output paths ----
-output_dir = os.path.abspath(os.path.join("data", SCENARIO.value, "output"))
+output_dir = os.path.abspath(os.path.join("data", SCENARIO.value, "output", SAMPLING_METHOD.value, "lion"))
 os.makedirs(output_dir, exist_ok=True)
 csv_path = os.path.join(output_dir, "results.csv")
+storage = f"sqlite:///{os.path.join(output_dir, 'optuna_study.db')}"
+study_name = f"{SCENARIO.value}_{SAMPLING_METHOD.value}_lion"
+log_dir_path = os.path.join(output_dir, "logs")
 
-# ---- Results CSV bootstrap ----
+# ---- Results CSV bootstrap (keeps your schema/versioning) ----
 def ensure_results_csv():
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path)
@@ -39,13 +68,13 @@ def ensure_results_csv():
     else:
         df = pd.DataFrame(columns=[
             "version","optimizer","learning_rate","weight_decay","beta_1","beta_2","eps",
-            "num_epochs","batch_size","training_set_size","train_error","test_error","train_time",
-            "n_layers","layer_depth","activation_function","sampling_method","scenario",
+            "num_epochs","batch_size","train_error","test_error","train_time", "n_layers",
+            "layer_depth","activation_function","sampling_method","scenario",
         ])
         version, results = 1, []
     return df, results, version
 
-# ---- Data factory (load inside objective) ----
+# ---- Data factory (load inside objective to avoid big pickles) ----
 def make_data(training_set_size: int):
     input_data = InputData(DATA_PATH)
     return input_data.get_training_and_test_data(
@@ -53,26 +82,26 @@ def make_data(training_set_size: int):
         training_set_size=training_set_size,
     )
 
-# ---- Objective for Lion ----
+# ---- Objective: sample architecture + Lion hyperparams + data sizes ----
 def objective(trial: optuna.Trial):
-    # Architecture search space (mirrors your old grids but continuous where useful)
-    n_layers = trial.suggest_int("n_layers", 2, 10)  # NUM_HIDDEN_LAYERS
-    layer_depth = trial.suggest_categorical("layer_depth", [2, 4, 6, 8, 10])
-    activation = trial.suggest_categorical("activation", [torch.nn.Sigmoid, torch.nn.Tanh])
+    # Architecture
+    n_layers = trial.suggest_int("n_layers", 2, 20)                   # NUM_HIDDEN_LAYERS
+    layer_depth = trial.suggest_int("layer_depth", 2,12)
+    activation = trial.suggest_categorical("activation", ["Sigmoid", "Tanh"])
 
     # Data sizes
-    training_set_size = trial.suggest_categorical("training_set_size", [128, 512, 1024, 2048, 4096, 8192])
-    batch_size = trial.suggest_categorical("batch_size", [64, 256, 1024])
+    # training_set_size = 8192
+    # training_set_size = trial.suggest_categorical("training_set_size", [128, 512, 1024, 2048, 4096, 8192])
+    batch_size = trial.suggest_categorical("batch_size", [64, 128, 256, 512, 1024])
 
-    # Lion hyperparams (expanded around your presets)
-    beta1 = trial.suggest_float("beta1", 0.88, 0.92, step=0.01)   # around 0.9
-    beta2 = trial.suggest_float("beta2", 0.98, 0.995, step=0.001) # around 0.99
-    lr = trial.suggest_float("lr", 8e-4, 5e-3, log=True)
-    weight_decay = trial.suggest_float("weight_decay", 0.0, 3e-5, log=True)
+    # Lion hyperparams
+    lr = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
+    weight_decay = trial.suggest_float("weight_decay", 1e-8, 1e-3, log=True)
+    beta1 = trial.suggest_float("beta1", 0.85, 0.99, step=0.01)
+    beta2 = trial.suggest_float("beta2", 0.95, 0.999, step=0.001)
 
-    # Epochs and reporting cadence
-    max_epochs = 1500
-    report_every = 25
+    # Training length (you can also make this tunable)
+    report_epochs_cycle = 25  # for pruning cadence
 
     arch = NeuralNetworkArchitecture(
         INPUT_DIM=scenario_settings.INPUT_DIM,
@@ -95,58 +124,66 @@ def objective(trial: optuna.Trial):
     model = SequentialNeuralNetwork(net_arch=arch)
 
     try:
-        model.train(settings=cfg, data=data, trial=trial, report_every=report_every)
+        model.train(settings=cfg, data=data, trial=trial, report_every=report_epochs_cycle, log_dir=log_dir_path)
     except optuna.TrialPruned:
         raise
 
-    # Optimize generalization error
+    # Optimize test/generalization error
     test_err = model.generalization_error
 
-    # Store extras
+    # Store useful metadata on the trial
     trial.set_user_attr("train_error", model.train_error)
     trial.set_user_attr("train_time", model.training_results["train_time"])
-    trial.set_user_attr("activation_fn", arch.ACTIVATION_FUNCTION.__name__)
+    trial.set_user_attr("activation_fn", arch.ACTIVATION_FUNCTION)
 
     return test_err
 
 if __name__ == "__main__":
     df, results_list, version = ensure_results_csv()
 
-    # Device-aware parallelism (single process on GPU/MPS)
+    # Device-aware parallelism: avoid GPU/MPS contention
     use_accel = torch.cuda.is_available() or torch.backends.mps.is_available()
-    n_jobs = 1 if use_accel else max(1, (os.cpu_count() or 1))
+    n_jobs = 1 if use_accel else max(1, (os.cpu_count() or 1) - 0)
 
-    # In-memory study (no persistent storage)
-    sampler = TPESampler(seed=42, n_startup_trials=20, multivariate=True, group=True)
+    # Reproducible TPE + median pruning
+    sampler = TPESampler(seed=42, n_startup_trials=20)
     pruner = MedianPruner(n_startup_trials=15, n_warmup_steps=2, interval_steps=1)
-    study = optuna.create_study(direction="minimize", sampler=sampler, pruner=pruner)
 
-    N_TRIALS = int(os.environ.get("N_TRIALS", "80"))
+    study = optuna.create_study(
+        study_name=study_name,
+        storage=storage,
+        direction="minimize",
+        sampler=sampler,
+        pruner=pruner,
+        load_if_exists=True,
+    )
 
-    print(f"[Optuna] Starting (no storage) with {N_TRIALS} trials, n_jobs={n_jobs}")
+    # Configure trials
+    N_TRIALS = int(os.environ.get("N_TRIALS", f"{trials}"))
+
+    print(f"[Optuna] Starting study '{study_name}' ({N_TRIALS} trials, n_jobs={n_jobs})")
     t0 = time.time()
     study.optimize(objective, n_trials=N_TRIALS, n_jobs=n_jobs, gc_after_trial=True, show_progress_bar=True)
     print(f"[Optuna] Done in {time.time()-t0:.1f}s. Best value={study.best_value:.6g}")
 
-    # Export all trials to CSV for analysis
+    # Export all trials (nice for analysis)
     trials_df = study.trials_dataframe(attrs=("number","value","state","params","user_attrs"))
     trials_csv = os.path.join(output_dir, f"optuna_trials_{int(time.time())}.csv")
     trials_df.to_csv(trials_csv, index=False)
 
-    # Append current best to your results.csv with your original schema
+    # Append the current best to your results.csv with your original schema
     best = study.best_trial
     p, ua = best.params, best.user_attrs
     results_list.append({
         "version": version,
         "optimizer": "lion",
-        "learning_rate": p["lr"],
+        "learning_rate": p["learning_rate"],
         "weight_decay": p["weight_decay"],
         "beta_1": p["beta1"],
         "beta_2": p["beta2"],
-        "eps": None,
-        "num_epochs": 1500,
+        "num_epochs": max_epochs,
         "batch_size": p["batch_size"],
-        "training_set_size": p["training_set_size"],
+        "training_set_size": training_set_size,
         "train_error": ua.get("train_error", None),
         "test_error": best.value,
         "train_time": ua.get("train_time", None),
@@ -162,3 +199,20 @@ if __name__ == "__main__":
 
     print(f"[Optuna] Trials CSV: {trials_csv}")
     print(f"[Optuna] Results CSV updated: {csv_path}")
+
+    print("\nBest hyperparameters found:")
+    for k, v in best.params.items():
+        print(f"{k}: {v}")
+    print("User attributes:")
+    for k, v in best.user_attrs.items():
+        print(f"{k}: {v}")
+
+    best_hyperparams = {
+        "params": best.params,
+        "user_attrs": best.user_attrs,
+        "test_error": best.value,
+    }
+    best_json_path = os.path.join(output_dir, "best_hyperparameters.json")
+    with open(best_json_path, "w") as f:
+        json.dump(best_hyperparams, f, indent=2)
+    print(f"Best hyperparameters saved to: {best_json_path}")
