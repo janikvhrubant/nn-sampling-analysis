@@ -12,12 +12,12 @@
 # python notebooks/lion_tuning.py --scenario simsin6d --sampling mc && \
 # python notebooks/adam_tuning.py --scenario simsin6d --sampling mc && \
 
-# python notebooks/lion_tuning.py --scenario simsin8d --sampling halton && \
-# python notebooks/adam_tuning.py --scenario simsin8d --sampling halton && \
-# python notebooks/lion_tuning.py --scenario simsin8d --sampling sobol && \
-# python notebooks/adam_tuning.py --scenario simsin8d --sampling sobol && \
-# python notebooks/lion_tuning.py --scenario simsin8d --sampling mc && \
-# python notebooks/adam_tuning.py --scenario simsin8d --sampling mc && \
+python notebooks/lion_tuning.py --scenario simsin8d --sampling halton && \
+python notebooks/adam_tuning.py --scenario simsin8d --sampling halton && \
+python notebooks/lion_tuning.py --scenario simsin8d --sampling sobol && \
+python notebooks/adam_tuning.py --scenario simsin8d --sampling sobol && \
+python notebooks/lion_tuning.py --scenario simsin8d --sampling mc && \
+python notebooks/adam_tuning.py --scenario simsin8d --sampling mc && \
 
 python notebooks/lion_tuning.py --scenario simsin10d --sampling halton && \
 python notebooks/adam_tuning.py --scenario simsin10d --sampling halton && \
