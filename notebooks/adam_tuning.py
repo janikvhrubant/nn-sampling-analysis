@@ -9,6 +9,7 @@ from optuna.samplers import TPESampler
 from optuna.pruners import MedianPruner
 import argparse
 import json
+import glob
 
 sys.path.append(os.path.abspath("src"))
 from data_classes.architecture import NeuralNetworkArchitecture
@@ -49,7 +50,7 @@ scenario_settings.DATA_PATH = f"data/{SCENARIO.value}"
 DATA_PATH = scenario_settings.DATA_PATH
 max_epochs = 1000
 eps = 1e-8
-training_set_size = 8192
+training_set_size = 4096
 trials = 100
 
 # ---- Output paths ----
@@ -141,6 +142,14 @@ def objective(trial: optuna.Trial):
 
     return test_err
 
+def get_latest_hyperparams_json(output_dir):
+    files = sorted(glob.glob(os.path.join(output_dir, "best_hyperparameters*.json")))
+    if files:
+        latest_file = files[-1]
+        with open(latest_file, "r") as f:
+            return json.load(f), latest_file
+    return None, None
+
 if __name__ == "__main__":
     df, results_list, version = ensure_results_csv()
 
@@ -161,8 +170,17 @@ if __name__ == "__main__":
         load_if_exists=True,
     )
 
+    # Load latest hyperparameters if available and enqueue as first trial
+    loaded_hyperparams, loaded_file = get_latest_hyperparams_json(output_dir)
+    if loaded_hyperparams:
+        print(f"Loaded best hyperparameters from: {loaded_file}")
+        print("Enqueuing these hyperparameters for first Optuna trial:")
+        for k, v in loaded_hyperparams["params"].items():
+            print(f"{k}: {v}")
+        study.enqueue_trial(loaded_hyperparams["params"])
+
     # Configure trials
-    N_TRIALS = int(os.environ.get("N_TRIALS", "{trials}"))
+    N_TRIALS = int(os.environ.get("N_TRIALS", f"{trials}"))
 
     print(f"[Optuna] Starting study '{study_name}' ({N_TRIALS} trials, n_jobs={n_jobs})")
     t0 = time.time()
@@ -216,7 +234,19 @@ if __name__ == "__main__":
         "user_attrs": best.user_attrs,
         "test_error": best.value,
     }
-    best_json_path = os.path.join(output_dir, "best_hyperparameters.json")
+    
+    base_json_path = os.path.join(output_dir, "best_hyperparameters.json")
+    if not os.path.exists(base_json_path):
+        best_json_path = base_json_path
+    else:
+        i = 1
+        while True:
+            candidate = os.path.join(output_dir, f"best_hyperparameters{i}.json")
+            if not os.path.exists(candidate):
+                best_json_path = candidate
+                break
+            i += 1
+            
     with open(best_json_path, "w") as f:
         json.dump(best_hyperparams, f, indent=2)
     print(f"Best hyperparameters saved to: {best_json_path}")

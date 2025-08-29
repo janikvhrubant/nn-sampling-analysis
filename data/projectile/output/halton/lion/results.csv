@@ -1,0 +1,3 @@
+version,optimizer,learning_rate,weight_decay,beta_1,beta_2,num_epochs,batch_size,training_set_size,train_error,test_error,train_time,n_layers,layer_depth,activation_function,sampling_method,scenario
+1,lion,0.002661901888489,3.334792728637582e-07,0.86,0.984,1000,1024,8192,0.0390348844230175,0.0346468277275562,43.224315881729126,5,7,Sigmoid,halton,projectile
+2,lion,0.002661901888489057,3.3347927286375814e-07,0.86,0.984,1,1024,4096,0.0390348844230175,0.03464682772755623,43.224315881729126,5,7,Sigmoid,halton,projectile

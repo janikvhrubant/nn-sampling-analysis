@@ -1,0 +1,18 @@
+{
+  "params": {
+    "n_layers": 5,
+    "layer_depth": 7,
+    "activation": "Sigmoid",
+    "batch_size": 1024,
+    "learning_rate": 0.002661901888489057,
+    "weight_decay": 3.3347927286375814e-07,
+    "beta1": 0.86,
+    "beta2": 0.984
+  },
+  "user_attrs": {
+    "activation_fn": "Sigmoid",
+    "train_error": 0.0390348844230175,
+    "train_time": 43.224315881729126
+  },
+  "test_error": 0.03464682772755623
+}

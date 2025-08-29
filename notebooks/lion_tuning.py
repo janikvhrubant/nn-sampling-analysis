@@ -48,7 +48,7 @@ scenario_settings = ScenarioSettings(SCENARIO)
 scenario_settings.DATA_PATH = f"data/{SCENARIO.value}"
 DATA_PATH = scenario_settings.DATA_PATH
 max_epochs = 1000
-training_set_size = 8192
+training_set_size = 4096
 trials = 100
 
 # ---- Output paths ----
@@ -212,7 +212,19 @@ if __name__ == "__main__":
         "user_attrs": best.user_attrs,
         "test_error": best.value,
     }
-    best_json_path = os.path.join(output_dir, "best_hyperparameters.json")
+
+    base_json_path = os.path.join(output_dir, "best_hyperparameters.json")
+    if not os.path.exists(base_json_path):
+        best_json_path = base_json_path
+    else:
+        i = 1
+        while True:
+            candidate = os.path.join(output_dir, f"best_hyperparameters{i}.json")
+            if not os.path.exists(candidate):
+                best_json_path = candidate
+                break
+            i += 1
+
     with open(best_json_path, "w") as f:
         json.dump(best_hyperparams, f, indent=2)
     print(f"Best hyperparameters saved to: {best_json_path}")
