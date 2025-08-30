@@ -21,9 +21,9 @@ from models import SequentialNeuralNetwork
 
 scenario_map = {
     "projectile": Scenario.PROJECTILE,
-    "sin6d": Scenario.SUM_SINES_6D,
-    "sind8d": Scenario.SUM_SINES_8D,
-    "sin10d": Scenario.SUM_SINES_10D}
+    "sumsin6d": Scenario.SUM_SINES_6D,
+    "sumsin8d": Scenario.SUM_SINES_8D,
+    "sumsin10d": Scenario.SUM_SINES_10D}
 
 sampling_method_map = {
     "halton": SamplingMethod.HALTON,
