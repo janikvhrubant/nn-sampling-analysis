@@ -59,7 +59,7 @@ training_set_sizes = [2**i for i in range(5,14)]
 all_training_settings = []
 training_settings = []
 
-for width, depth, learning_rate, lambda_, training_set_size in product(widths, depths, lambdas, learning_rates, training_set_sizes):
+for experiment, width, depth, learning_rate, lambda_, training_set_size in product(experiments, widths, depths, lambdas, learning_rates, training_set_sizes):
     nn_arch = NeuralNetworkArchitecture(
         INPUT_DIM=scenario_settings.INPUT_DIM,
         OUTPUT_DIM=scenario_settings.OUTPUT_DIM,
