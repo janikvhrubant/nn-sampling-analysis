@@ -53,7 +53,8 @@ widths = [6,12,24]
 depths = [4,8,16]
 learning_rates = [0.01,0.001]
 lambdas = [1.0e-04,1.0e-05,1.0e-06,1e-07]
-training_set_sizes = scenario_settings.TRAINING_SET_SIZES
+# training_set_sizes = scenario_settings.TRAINING_SET_SIZES
+training_set_sizes = [2**i for i in range(5,14)]
 
 all_training_settings = []
 training_settings = []
