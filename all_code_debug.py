@@ -24,7 +24,7 @@ from tqdm import tqdm
 #     SCENARIO=Scenario.PROJECTILE
 # )
 
-scenario = Scenario.SUM_SINES_6D
+scenario = Scenario.PROJECTILE
 experiments = [
     Experiment(
         SAMPLING_METHOD=SamplingMethod.SOBOL,
