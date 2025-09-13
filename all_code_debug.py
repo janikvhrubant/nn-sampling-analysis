@@ -53,12 +53,12 @@ lambdas = [1.0e-04,1.0e-05,1.0e-06,1e-07]
 training_set_sizes = [2**i for i in range(5,14)]
 
 all_training_settings = []
-training_settings = []
 
 for experiment in experiments:
+    training_settings = []
     scenario_settings = ScenarioSettings(experiment.SCENARIO)
     input_data = InputData(scenario_settings.DATA_PATH)
-    for width, depth, learning_rate, lambda_, training_set_size in product(widths, depths, lambdas, learning_rates, training_set_sizes):
+    for width, depth, learning_rate, lambda_, training_set_size in product(widths, depths, learning_rates, lambdas, training_set_sizes):
         nn_arch = NeuralNetworkArchitecture(
             INPUT_DIM=scenario_settings.INPUT_DIM,
             OUTPUT_DIM=scenario_settings.OUTPUT_DIM,
@@ -95,15 +95,15 @@ for experiment in experiments:
             training_set_size=ts.training_set_size
         )
         nn.train(settings=ts.training_config, data=training_data)
-        training_results_list.extend(nn.training_results)
-        df_results = pd.DataFrame(training_results_list)
 
+        temp_results = nn.training_results
+        for temp_result in temp_results:
+            temp_result['sampling_type'] = experiment.SAMPLING_METHOD.value
+            temp_result['train_size'] = ts.training_set_size
+        training_results_list.extend(nn.training_results)
+
+        df_results = pd.DataFrame(training_results_list)
         df_results.sort_values('test_error', inplace=True)
         df_results.reset_index(drop=True, inplace=True)
-        df_results.to_csv(csv_path, index=False)
-
-        df_results['SamplingMethod'] = experiment.SAMPLING_METHOD
-        df_results['NumSamples'] = ts.training_set_size
-        df_results.to_csv(together_csv_path)
-
-
+        # df_results.to_csv(csv_path, index=False)
+        df_results.to_csv(together_csv_path, index=False)
