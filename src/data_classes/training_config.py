@@ -8,20 +8,13 @@ class BaseTrainingConfig:
     OPTIMIZER: OptimizationMethod
     LEARNING_RATE: float
     REG_PARAM: float
-    NUM_EPOCHS: int
+    MAX_EPOCHS: int = 2000
 
 @dataclass
 class TrainingSettings:
     nn_architecture: NeuralNetworkArchitecture
     training_config: BaseTrainingConfig
     training_set_size: int
-
-@dataclass
-class BaseTrainingConfig:
-    OPTIMIZER: OptimizationMethod
-    LEARNING_RATE: float
-    REG_PARAM: float
-    NUM_EPOCHS: int
 
 @dataclass
 class SGDTrainingConfig(BaseTrainingConfig):

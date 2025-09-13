@@ -3,8 +3,16 @@ import matplotlib.pyplot as plt
 from data_classes.scenario import Scenario
 
 G_FORCE = 9.81
-EPSILON: float = 0.1
-STEP_SIZE: float = 0.00125
+EPSILON = {
+    "density":     0.956,
+    "radius":      0.1027,
+    "drag_coeff":  0.45,
+    "mass":        0.48,
+    "init_height": 99,
+    "alpha":       90,
+    "init_v0":     49,
+}
+STEP_SIZE: float = 0.0001
 
 class ProjectileMethod:
     def __init__(self, y: np.ndarray):
@@ -23,33 +31,38 @@ class ProjectileMethod:
         return 2 * self.y_init - 1
 
     def calc_params(self):
-        G_y = self.G_transform()
+        G_y = self.y_init
 
-        self.density = 1.225 * (1 + EPSILON * G_y[0])
-        self.radius = 0.23 * (1 + EPSILON * G_y[1])
-        self.drag_coeff = 0.1 * (1 + EPSILON * G_y[2])
-        self.mass = 0.145 * (1 + EPSILON * G_y[3])
-        self.init_height = 1 + EPSILON * G_y[4]
-        self.alpha = 30 * (1 + EPSILON * G_y[5])
+        self.density = 0.269 + EPSILON["density"] * G_y[0]
+        self.radius = 0.0213 +EPSILON["radius"] * G_y[1]
+        self.drag_coeff = 0.25 + EPSILON["drag_coeff"] * G_y[2]
+        self.mass = 0.3 + EPSILON["mass"] * G_y[3]
+        self.init_height = 1 + EPSILON["init_height"] * G_y[4]
+        self.alpha = 0 + EPSILON["alpha"] * G_y[5]
         
-        init_velocity = 25 * (1 + EPSILON * G_y[6])
+        init_velocity = 1 + EPSILON["init_v0"] * G_y[6]
         self.init_x_velocity = init_velocity * np.cos(np.radians(self.alpha))  # Use radians for angle
         self.init_h_velocity = init_velocity * np.sin(np.radians(self.alpha))
 
     def calc_drag_force(self) -> float:
-        velocity_norm_squared = np.linalg.norm(self.curr_velocity_vec())**2
         area = np.pi * self.radius**2
-        drag_force = (0.5 * self.density * self.drag_coeff * area * velocity_norm_squared) / self.mass
-        return drag_force
+        return 0.5 * self.density * self.drag_coeff * area / self.mass
 
     def ode_step(self):
-        drag_force = self.calc_drag_force()
+        k = self.calc_drag_force()
+        vx = self.curr_x_velocity[-1]
+        vy = self.curr_h_velocity[-1]
+        speed = np.hypot(vx, vy)  # ||v||
 
-        self.curr_x = np.append(self.curr_x, self.curr_x[-1] + self.curr_x_velocity[-1] * STEP_SIZE)
-        self.curr_height = np.append(self.curr_height, self.curr_height[-1] + self.curr_h_velocity[-1] * STEP_SIZE)
+        # accelerations (vector drag)
+        ax = -k * speed * vx
+        ay = -G_FORCE - k * speed * vy
 
-        self.curr_x_velocity = np.append(self.curr_x_velocity, self.curr_x_velocity[-1] - STEP_SIZE * drag_force)
-        self.curr_h_velocity = np.append(self.curr_h_velocity, self.curr_h_velocity[-1] - STEP_SIZE * G_FORCE)
+        # explicit Euler update
+        self.curr_x        = np.append(self.curr_x,        self.curr_x[-1]        + vx * STEP_SIZE)
+        self.curr_height   = np.append(self.curr_height,   self.curr_height[-1]   + vy * STEP_SIZE)
+        self.curr_x_velocity = np.append(self.curr_x_velocity, vx + ax * STEP_SIZE)
+        self.curr_h_velocity = np.append(self.curr_h_velocity, vy + ay * STEP_SIZE)
 
     def plot(self):
         plt.plot(self.curr_x, self.curr_height, label="Projectile Path")
@@ -87,7 +100,11 @@ def sum_sines_fun(x: np.ndarray):
 
 def get_experiment_function(scenario: Scenario):
     match scenario:
-        case Scenario.SUM_SINES:
+        case Scenario.SUM_SINES_6D:
+            return sum_sines_fun
+        case Scenario.SUM_SINES_8D:
+            return sum_sines_fun
+        case Scenario.SUM_SINES_10D:
             return sum_sines_fun
         case Scenario.PROJECTILE:
             return projectile_motion_fun

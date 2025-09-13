@@ -3,7 +3,7 @@ from data_classes.architecture import NeuralNetworkArchitecture
 from data_classes.training_config import BaseTrainingConfig, OptimizationMethod
 from data_classes.training_data import TrainingData
 import torch
-from datetime import datetime
+import time
 
 def init_weights(m):
     if isinstance(m, nn.Linear):
@@ -41,6 +41,7 @@ class SequentialNeuralNetwork:
 
         self.model.apply(init_weights)
         self.model = self.model.to(self.device)
+        self.training_results = []
 
     def create_optimizer(self, config: BaseTrainingConfig):
         match config.OPTIMIZER:
@@ -74,21 +75,22 @@ class SequentialNeuralNetwork:
                 raise NotImplementedError(f"Optimizer for {config.OPTIMIZER} is not implemented")
 
     def evaluate(self, data: TrainingData):
-        test_objective = nn.L1Loss()
+        mae_fun = nn.L1Loss()
 
-        train_x = data.train_x.to(self.device).float()
-        train_y = data.train_y.to(self.device).float()
+        # train_x = data.train_x.to(self.device).float()
+        # train_y = data.train_y.to(self.device).float()
         test_x = data.test_x.to(self.device).float()
         test_y = data.test_y.to(self.device).float()
 
-        output_train = self.model(train_x)
-        train_error = test_objective(output_train, train_y).item()
+        # output_train = self.model(train_x)
+        # train_error = test_objective(output_train, train_y).item()
 
         output_test = self.model(test_x)
-        generalization_error = test_objective(output_test, test_y).item()
+        test_error = mae_fun(output_test, test_y).item()
 
-        self.train_error = train_error
-        self.generalization_error = generalization_error
+        # self.train_error = train_error
+        # self.generalization_error = generalization_error
+        return test_error
 
     def train(self, settings: BaseTrainingConfig, data: TrainingData):
         optimizer = self.create_optimizer(settings)
@@ -96,27 +98,34 @@ class SequentialNeuralNetwork:
         train_x = data.train_x.to(self.device).float()
         train_y = data.train_y.to(self.device).float()
 
-        train_objective = nn.MSELoss()
+        mse_fun = nn.MSELoss()
+        mae_fun = nn.L1Loss()
 
-        t = datetime.now()
-        for e in range(settings.NUM_EPOCHS):
+        sum_times = 0
+        for e in range(settings.MAX_EPOCHS):
+            start_time = time.time()
+            self.model.train()
             optimizer.zero_grad()
             output = self.model(train_x)
-            loss = train_objective(output, train_y)
-            loss.backward()
+            train_loss = mse_fun(output, train_y)
+            train_loss.backward()
             optimizer.step()
-        optim_time = datetime.now() - t
-        self.evaluate(data)
 
-        self.training_results = {
-            "learning_rate": settings.LEARNING_RATE,
-            "reg_param": settings.REG_PARAM,
-            "batch_norm": self.net_arch.BATCH_NORMALIZATION,
-            "depth": self.net_arch.DEPTH,
-            "num_hidden_layers": self.net_arch.NUM_HIDDEN_LAYERS,
-            "activation": self.net_arch.ACTIVATION_FUNCTION.__name__,
-            "train_error": self.train_error,
-            "test_error": self.generalization_error,
-            "train_size": len(data.train_x),
-            "optim_time": optim_time.seconds
-        }
+            optim_time = time.time()-start_time
+            sum_times += optim_time
+            self.model.eval()
+            test_loss = self.evaluate(data)
+            self.training_results.append({
+                "learning_rate": settings.LEARNING_RATE,
+                "reg_param": settings.REG_PARAM,
+                "batch_norm": self.net_arch.BATCH_NORMALIZATION,
+                "depth": self.net_arch.DEPTH,
+                "num_hidden_layers": self.net_arch.NUM_HIDDEN_LAYERS,
+                "activation": self.net_arch.ACTIVATION_FUNCTION.__name__,
+                "train_error": train_loss.item(),
+                "test_error": test_loss,
+                "epoch": e+1,
+                "optim_time": sum_times
+            })
+            if e % 100 == 0:
+                print(f'Epoch {e} finished')
